@@ -47,7 +47,6 @@ func getEnvironmentsForPage(pageNumber int) (map[string]int, error) {
 
 	jsonResponse, err := getJSONFromRequest(req)
 
-	fmt.Println("JSON Response: ", jsonResponse)
 	for _,v := range jsonResponse["environments"].([]interface{}) {
 		environments[v.(map[string]interface{})["name"].(string)] = int(v.(map[string]interface{})["current_state_id"].(float64))
 	}
@@ -64,7 +63,6 @@ func getLatestStateVersionForEnvironment(environmentName string, id int) (int, e
 
 	jsonResponse, err := getJSONFromRequest(req)
 
-	fmt.Println("JSON response for latest state version: ", jsonResponse)
 	if err != nil {
 		return -1, nil
 	}
@@ -100,7 +98,7 @@ func downloadState(environmentName string, id int, stateVersion int) error {
 		return err
 	}
 
-	err = ioutil.WriteFile(fmt.Sprintf("%s/states/%s-sessionState-%d", sessionDownloadPath, environmentName, stateVersion), data, 0644)
+	err = ioutil.WriteFile(fmt.Sprintf("%s/%s-sessionState-%d", sessionDownloadPath, environmentName, stateVersion), data, 0644)
 	if err != nil {
 		return err
 	}
@@ -110,10 +108,11 @@ func downloadState(environmentName string, id int, stateVersion int) error {
 
 func main() {
 	pageNumber := 1
+	sessionCount := 1
 	parser := argparse.NewParser("backup_atlas", "performs backup of all Atlas legacy states")
 	c := parser.String("c", "cookie", &argparse.Options{Required: true, Help: "Cookie payload generated after authenticating with Atlas via web"})
 	p := parser.String("p", "path", &argparse.Options{Required: true, Help: "Path to save session state files"})
-	o := parser.String("o", "org", &argparse.Options{Required: false, Help: "Organization name"})
+	o := parser.String("o", "org", &argparse.Options{Required: true, Help: "Organization name"})
 
 	err := parser.Parse(os.Args)
 	atlasSessionToken = *c
@@ -127,12 +126,16 @@ func main() {
 		fmt.Println("Getting environments for page: ", pageNumber)
 		environments, err := getEnvironmentsForPage(pageNumber)
 		if err != nil {
-			fmt.Printf("Error during inf loop.  %v\n", err)
+			fmt.Printf("Error getting environments for page: %d.  Error: %v\n", pageNumber, err)
+			break
+		}
+
+		if len(environments) < 1 {
 			break
 		}
 
 		for name, id := range environments {
-			fmt.Println("Getting latest state number for env: ", name, " with id: ", id)
+			fmt.Printf("#%d - Downloading state for environment: %s with id %v\n", sessionCount, name, id)
 			latestState, err := getLatestStateVersionForEnvironment(name, id)
 
 			if err != nil {
@@ -144,9 +147,13 @@ func main() {
 				log.Printf("** Issue downloading latest state.  %v", err)
 				continue
 			}
+
+			sessionCount += 1
 		}
 
 		pageNumber += 1
 		time.Sleep(2 * time.Second)
 	}
+
+	fmt.Printf("Done downloading  %d session states.\n", sessionCount)
 }
