@@ -14,6 +14,7 @@ import (
 var (
 	atlasSessionToken = ""
 	sessionDownloadPath = ""
+	organizationName = ""
 )
 
 func getJSONFromRequest(req *http.Request) (map[string]interface{}, error) {
@@ -38,7 +39,7 @@ func getJSONFromRequest(req *http.Request) (map[string]interface{}, error) {
 func getEnvironmentsForPage(pageNumber int) (map[string]int, error) {
 	environments := make(map[string]int)
 
-	req, err := http.NewRequest("GET", fmt.Sprintf("https://app.terraform.io/ui/environments?enterprise_tool=terraform&page=%d&username=saj", pageNumber), nil)
+	req, err := http.NewRequest("GET", fmt.Sprintf("https://app.terraform.io/ui/environments?enterprise_tool=terraform&page=%d&username=%s", pageNumber, organizationName), nil)
 
 	if err != nil {
 		return map[string]int{}, nil
@@ -55,7 +56,7 @@ func getEnvironmentsForPage(pageNumber int) (map[string]int, error) {
 }
 
 func getLatestStateVersionForEnvironment(environmentName string, id int) (int, error) {
-	requestString := fmt.Sprintf("https://app.terraform.io/ui//saj/environments/%s/states/%d/state-versions?page=1", environmentName, int(id))
+	requestString := fmt.Sprintf("https://app.terraform.io/ui//%s/environments/%s/states/%d/state-versions?page=1", organizationName, environmentName, int(id))
 	req, err := http.NewRequest("GET", requestString, nil)
 	if err != nil {
 		return -1, err
@@ -84,7 +85,7 @@ func downloadState(environmentName string, id int, stateVersion int) error {
 	}
 
 	client := http.Client{}
-	requestString := fmt.Sprintf("https://app.terraform.io/ui/saj/environments/%s/states/%d/state-versions/%d/raw", environmentName, id, stateVersion)
+	requestString := fmt.Sprintf("https://app.terraform.io/ui/%s/environments/%s/states/%d/state-versions/%d/raw", organizationName, environmentName, id, stateVersion)
 	req, err := http.NewRequest("GET", requestString, nil)
 
 	if err != nil {
@@ -109,13 +110,15 @@ func downloadState(environmentName string, id int, stateVersion int) error {
 
 func main() {
 	pageNumber := 1
-	parser := argparse.NewParser("backup_atlas", "performs backup of all SAJ legacy states")
+	parser := argparse.NewParser("backup_atlas", "performs backup of all Atlas legacy states")
 	c := parser.String("c", "cookie", &argparse.Options{Required: true, Help: "Cookie payload generated after authenticating with Atlas via web"})
 	p := parser.String("p", "path", &argparse.Options{Required: true, Help: "Path to save session state files"})
+	o := parser.String("o", "org", &argparse.Options{Required: false, Help: "Organization name"})
 
 	err := parser.Parse(os.Args)
 	atlasSessionToken = *c
 	sessionDownloadPath = *p
+	organizationName = *o
 
 	if err != nil {
 		fmt.Print(parser.Usage(err))
