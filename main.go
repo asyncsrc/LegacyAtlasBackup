@@ -148,7 +148,7 @@ func main() {
 			latestState, err := getLatestStateVersionForEnvironment(name, id)
 
 			if err != nil {
-				log.Printf("** Issue getting latest state for: %v.  Error: %v\n", latestState, err)
+				log.Printf("** Issue getting latest state for: %v.  Error: %v\n", name, err)
 				continue
 			}
 
